@@ -2,35 +2,118 @@ import psycopg2
 from psycopg2 import extras
 import datetime
 import pytz
+import logging
+import time
+import requests
 from decimal import Decimal, ROUND_HALF_UP
 from dateutil.relativedelta import relativedelta
-from typing import Union
+from typing import Union, Callable
 
-from st_common_data import datum
+logger = logging.getLogger(__name__)
 
-HOLIDAYS_LIST_CACHE = dict()
 
 try:
     from app.settings import config
     from st_common_data.auth.fastapi_auth import service_auth0_token
-    HOLIDAYS_LIST_CACHE = datum.api_get_holidays(
-        datum_api_url=config.datum_api_url,
-        service_auth0_token=service_auth0_token,
-        gte_date='2018-01-01',
-        lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
-    )
+
+    DATUM_API_URL = config.datum_api_url
+    PROJECT_NAME = config.project_name
+    VERSION = config.version
 except Exception as e:
     try:
         from django.conf import settings
         from st_common_data.auth.django_auth import service_auth0_token
-        HOLIDAYS_LIST_CACHE = datum.api_get_holidays(
-                datum_api_url=settings.DATUM_API_URL,
-                service_auth0_token=service_auth0_token,
-                gte_date='2018-01-01',
-                lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
-        )
+
+        DATUM_API_URL = settings.DATUM_API_URL
+        PROJECT_NAME = settings.PROJECT_NAME
+        VERSION = settings.VERSION
     except Exception:
-        pass
+        DATUM_API_URL = None
+        PROJECT_NAME = None
+        VERSION = None
+
+
+HOLIDAYS_LIST_CACHE = None
+
+
+def make_project_info_dict() -> dict[str, str]:
+    try:
+        version, environment = VERSION.split("-")
+    except ValueError:
+        version, environment = "1.0.0", "test"
+        logger.error(f"Unsupported version of project: {VERSION}")
+    return {
+        "name": PROJECT_NAME,
+        "version": version,
+        "environment": environment,
+    }
+
+
+def make_user_agent() -> str:
+    info = make_project_info_dict()
+    return f"{info['name']}/{info['version']} {info['environment']}"
+
+
+def http_request(
+        method: str,
+        url: str,
+        bearer: str = None,
+        data: dict = None,
+        params: dict = None,
+        timeout: int = 30,
+        retry: int = 0,
+        retry_time: int = 10,
+        error_msg_prefix: str = None,
+        raw_data: bool = False,
+        headers: dict = None,
+        verify_sert: bool = True,
+        proxies: dict = None,
+        multipart_form_data: bool = False,
+        is_send_to_chat: bool = False,
+        chat_id: int = None,
+        msk_callback: Callable = None
+):
+    variables = locals()
+
+    if headers is None:
+        headers = {'Authorization': f'Bearer {bearer}'}
+
+    headers['User-Agent'] = make_user_agent()
+
+    response = requests.request(
+        method=method,
+        url=url,
+        json=data if not multipart_form_data else None,
+        data=data if multipart_form_data else None,
+        params=params,
+        headers=headers,
+        timeout=timeout,
+        verify=verify_sert,
+        proxies=proxies
+    )
+
+    if not response.ok:
+        if retry:
+            time.sleep(retry_time)
+            variables['retry'] -= 1
+            result = http_request(**variables)
+        else:
+            error_message = f'{url} returned with {response.status_code} status code, details:  {response.text}'
+            # update message
+            if error_msg_prefix:
+                error_message = error_message + error_message
+
+            if is_send_to_chat:
+                msk_callback(chat_id, error_message)
+            logger.error(error_message)
+            raise Exception(f'{url} returned with {response.status_code} status code, details:  {response.text}')
+    else:
+        if raw_data:
+            result = response.content
+        else:
+            result = response.json()
+
+    return result
 
 
 def touch_db(query, dbp, params=None, save=False, returning=False, transaction=False):
@@ -93,7 +176,16 @@ def get_current_kyiv_datetime():
 
 
 def is_holiday(current_datetime):
+    global HOLIDAYS_LIST_CACHE
     date_str = str(current_datetime.date())
+    if not HOLIDAYS_LIST_CACHE:
+        from st_common_data.datum import api_get_holidays
+        HOLIDAYS_LIST_CACHE = api_get_holidays(
+                datum_api_url=DATUM_API_URL,
+                service_auth0_token=service_auth0_token,
+                gte_date='2018-01-01',
+                lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
+        )
     for row in HOLIDAYS_LIST_CACHE:
         if date_str == row['holiday_date']:
             return True
