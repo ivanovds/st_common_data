@@ -6,31 +6,21 @@ from decimal import Decimal, ROUND_HALF_UP
 from dateutil.relativedelta import relativedelta
 from typing import Union
 
-from st_common_data import datum
-
-HOLIDAYS_LIST_CACHE = dict()
 
 try:
     from app.settings import config
     from st_common_data.auth.fastapi_auth import service_auth0_token
-    HOLIDAYS_LIST_CACHE = datum.api_get_holidays(
-        datum_api_url=config.datum_api_url,
-        service_auth0_token=service_auth0_token,
-        gte_date='2018-01-01',
-        lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
-    )
+    DATUM_API_URL = config.datum_api_url
 except Exception as e:
     try:
         from django.conf import settings
         from st_common_data.auth.django_auth import service_auth0_token
-        HOLIDAYS_LIST_CACHE = datum.api_get_holidays(
-                datum_api_url=settings.DATUM_API_URL,
-                service_auth0_token=service_auth0_token,
-                gte_date='2018-01-01',
-                lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
-        )
+        DATUM_API_URL = settings.DATUM_API_URL
     except Exception:
         pass
+
+
+HOLIDAYS_LIST_CACHE = None
 
 
 def touch_db(query, dbp, params=None, save=False, returning=False, transaction=False):
@@ -93,7 +83,16 @@ def get_current_kyiv_datetime():
 
 
 def is_holiday(current_datetime):
+    global HOLIDAYS_LIST_CACHE
     date_str = str(current_datetime.date())
+    if not HOLIDAYS_LIST_CACHE:
+        from st_common_data.datum import api_get_holidays
+        HOLIDAYS_LIST_CACHE = api_get_holidays(
+                datum_api_url=DATUM_API_URL,
+                service_auth0_token=service_auth0_token,
+                gte_date='2018-01-01',
+                lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
+        )
     for row in HOLIDAYS_LIST_CACHE:
         if date_str == row['holiday_date']:
             return True

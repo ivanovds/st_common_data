@@ -263,14 +263,14 @@ def api_get_tickers_general_data(datum_api_url: str,
             example:
                 {'AAPL': {'country': 'USA', 'lvl1': 'Banking'}}
     """
-    kwargs = locals()
+    locals_variables = locals()
 
     keys_to_replace = {
         'country_hq': 'country'  # change "country_hq" to "country"
     }
 
     active_params_list = []
-    for param, value in kwargs.items():
+    for param, value in locals_variables.items():
         try:
             field = param.split('is_')[1]
             if value:
@@ -353,7 +353,7 @@ def api_get_tickers_daily_data(datum_api_url: str,
             example:
                 {'AAPL': {'c': 456.09, 'o': 342.56, 'v': 124552}}
     """
-    kwargs = locals()
+    locals_variables = locals()
     abbreviations = {
         'open': 'o',
         'close': 'c',
@@ -364,13 +364,13 @@ def api_get_tickers_daily_data(datum_api_url: str,
 
     next_workday = common.get_next_workday(
         datetime.datetime.strptime(
-            kwargs.pop('str_date'),
+            locals_variables.pop('str_date'),
             '%Y-%m-%d'
         ).date()
     )
 
     active_params_list = []
-    for param, value in kwargs.items():
+    for param, value in locals_variables.items():
         try:
             field = param.split('is_')[1]
             if value:
