@@ -57,15 +57,15 @@ class ServiceAuth0Token(metaclass=SingletonMeta):
     Auth0 token from service app for machine-to-machine communication (between services)
     """
     token_name = 'service_token'
+    audience = 'oa_api'
 
     def __init__(self,
-                 audience: str,
                  grant_type: str,
                  client_id: str,
                  client_secret: str,
                  services_token_url: str,
-                 redi_url: str):
-        self.audience = audience
+                 redi_url: str,
+                 audience: str = None):
         self.grant_type = grant_type
         self.client_id = client_id
         self.client_secret = client_secret
@@ -135,6 +135,7 @@ class ManagementAuth0Token(ServiceAuth0Token):
     Auth0 token from management app for communication with auth0 API
     """
     token_name = 'management_token'
+    audience = 'https://pine-trading-suite.us.auth0.com/api/v2/'
 
 
 class ServiceCAPAuth0Token(ServiceAuth0Token):
@@ -142,3 +143,4 @@ class ServiceCAPAuth0Token(ServiceAuth0Token):
     Auth0 CAP token
     """
     token_name = 'cap_service_token'
+    audience = 'cap_api'
