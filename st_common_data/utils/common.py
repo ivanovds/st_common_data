@@ -11,7 +11,6 @@ from typing import Union, Callable
 
 logger = logging.getLogger(__name__)
 
-
 try:
     from app.settings import config
     from st_common_data.auth.fastapi_auth import service_auth0_token
@@ -31,7 +30,6 @@ except Exception as e:
         DATUM_API_URL = None
         PROJECT_NAME = None
         VERSION = None
-
 
 HOLIDAYS_LIST_CACHE = None
 
@@ -69,8 +67,6 @@ def http_request(
         verify_sert: bool = True,
         proxies: dict = None,
         multipart_form_data: bool = False,
-        is_send_to_chat: bool = False,
-        chat_id: int = None,
         msk_callback: Callable = None
 ):
     variables = locals()
@@ -103,15 +99,18 @@ def http_request(
             if error_msg_prefix:
                 error_message = error_message + error_message
 
-            if is_send_to_chat:
-                msk_callback(chat_id, error_message)
+            if msk_callback:
+                msk_callback(text=error_message)
             logger.error(error_message)
             raise Exception(f'{url} returned with {response.status_code} status code, details:  {response.text}')
     else:
         if raw_data:
             result = response.content
         else:
-            result = response.json()
+            try:
+                result = response.json()
+            except:
+                result = None
 
     return result
 
@@ -181,10 +180,10 @@ def is_holiday(current_datetime):
     if not HOLIDAYS_LIST_CACHE:
         from st_common_data.datum import api_get_holidays
         HOLIDAYS_LIST_CACHE = api_get_holidays(
-                datum_api_url=DATUM_API_URL,
-                service_auth0_token=service_auth0_token,
-                gte_date='2018-01-01',
-                lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
+            datum_api_url=DATUM_API_URL,
+            service_auth0_token=service_auth0_token,
+            gte_date='2018-01-01',
+            lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
         )
     for row in HOLIDAYS_LIST_CACHE:
         if date_str == row['holiday_date']:
