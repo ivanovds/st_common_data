@@ -2,6 +2,7 @@ import datetime
 import requests
 import json
 import redis
+import re
 import logging
 from typing import Optional, Type
 from urllib.request import urlopen
@@ -17,6 +18,30 @@ class SingletonMeta(type):
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
         return cls._instances[cls]
+
+
+def proceed_user_agent(user_agent):
+    pattern = r"([\w\d-]*)(?:\/([\.0-9]*))?(?: (.*))?"
+
+    if not user_agent:
+        raise ValueError("UserAgent is None")
+
+    result = re.fullmatch(pattern, user_agent)
+
+    if not result:
+        raise ValueError("UserAgent is invalid")
+
+    app_name, version, env = result.groups()
+    data = {
+        "app_name": app_name,
+        "version": version,
+        "env": env,
+    }
+
+    if not app_name:
+        raise ValueError("App Name not found in UserAgent")
+
+    return data
 
 
 class JWKS(metaclass=SingletonMeta):

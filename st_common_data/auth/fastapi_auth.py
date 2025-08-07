@@ -1,15 +1,17 @@
 import importlib
 from dataclasses import dataclass
+import logging
 
 import jose.exceptions
 from fastapi import Request, Depends
 from jose import jwt
-from fastapi_exceptions.exceptions import AuthenticationFailed, PermissionDenied
+from fastapi_exceptions.exceptions import AuthenticationFailed, PermissionDenied, ValidationError
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
 from app.settings import config
+from . import proceed_user_agent
 
 UserModel = getattr(
     importlib.import_module('app.models'), config.auth_user_model
@@ -18,6 +20,7 @@ from . import JWKS, ServiceAuth0Token, ManagementAuth0Token
 
 
 jwks = JWKS(auth0_domain=config.auth0_domain, auth_exception=AuthenticationFailed)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -39,19 +42,23 @@ class Auth0Authentication:
         self, request: Request,
         audience: str = config.auth0_oa_api_audience
     ) -> dict:
-        header = self.get_header(request)
-        if header is None:
+        authorization = request.headers.get('authorization', None)
+        if authorization is None:
             raise AuthenticationFailed(
                 detail='No authorization header')
 
-        raw_token = self.get_raw_token(header)
+        raw_token = self.get_raw_token(authorization)
         if raw_token is None:
             raise AuthenticationFailed(
                 detail='Empty authorization header')
 
-        return await self.authenticate(raw_token, audience)
+        claims = await self.authenticate(raw_token, audience)
+        self.check_user_agent(request=request, claims=claims)
 
-    async def authenticate(self, raw_token, audience) -> dict:
+        return claims
+
+    @staticmethod
+    async def authenticate(raw_token, audience) -> dict:
         # Validation of token, if token is invalid - exception would be raised
         try:
             unverified_header = jwt.get_unverified_header(raw_token)
@@ -79,11 +86,8 @@ class Auth0Authentication:
 
         return payload
 
-    def get_header(self, request):
-        header = request.headers.get('authorization', None)
-        return header
-
-    def get_raw_token(self, header):
+    @staticmethod
+    def get_raw_token(header):
         """
         Extracts an unvalidated JSON web token from the given "Authorization"
         header value.
@@ -99,6 +103,22 @@ class Auth0Authentication:
                 detail='Authorization header must contain two space-delimited values')
 
         return parts[1]
+
+    @staticmethod
+    def check_user_agent(request: Request, claims: dict) -> None:
+        user_agent = request.headers.get('user-agent', None)
+        try:
+            proceed_user_agent(user_agent)
+        except ValueError as e:
+            if config.user_agent_strict:
+                return ValidationError({"error": str(e)})
+            logger.warning(str(e))
+
+        if 'sub' in claims:
+            auth0_id = claims['sub'].split('|')[1]
+        else:
+            auth0_id = 'service_token'
+        logger.info(f"Request to '{request.url.path}' from '{user_agent}' {auth0_id}")
 
 
 auth_backend = Auth0Authentication()

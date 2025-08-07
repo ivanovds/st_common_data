@@ -1,13 +1,15 @@
+import logging
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from rest_framework import HTTP_HEADER_ENCODING, authentication
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 import jose.exceptions
 from jose import jwt
 
-from . import JWKS, ServiceAuth0Token, ManagementAuth0Token
+from . import JWKS, ServiceAuth0Token, ManagementAuth0Token, proceed_user_agent
 
 UserModel = get_user_model()
+logger = logging.getLogger('django')
 
 
 jwks = JWKS(auth0_domain=settings.AUTH0_DOMAIN, auth_exception=AuthenticationFailed)
@@ -43,11 +45,13 @@ class Auth0Authentication(authentication.BaseAuthentication):
     auth0_service_client_id = settings.AUTH0_SERVICE_CLIENT_ID
 
     def authenticate(self, request):
-        header = self.get_header(request)
-        if header is None:
+        authorization = request.headers.get("authorization", None)
+        user_agent = request.headers.get("user-agent", None)
+
+        if authorization is None:
             return None
 
-        raw_token = self.get_raw_token(header)
+        raw_token = self.get_raw_token(authorization)
         if raw_token is None:
             return None
 
@@ -75,25 +79,17 @@ class Auth0Authentication(authentication.BaseAuthentication):
                 detail='Unable to parse authentication header')
 
         user = self.get_user(claims)
+
+        self.check_user_agent(user_agent)
+        logger.info(f"Request to '{request.path_info}' from '{user_agent}' "
+                    f"{user.auth0 if isinstance(user, UserModel) else user.__class__.__name__}")
         if not user:
             return None
         else:
             return user, claims
 
-    def get_header(self, request):
-        """
-        Extracts the header containing the JSON web token from the given
-        request.
-        """
-        header = request.META.get('HTTP_AUTHORIZATION')
-
-        if isinstance(header, str):
-            # Work around django test client oddness
-            header = header.encode(HTTP_HEADER_ENCODING)
-
-        return header
-
-    def get_raw_token(self, header):
+    @staticmethod
+    def get_raw_token(header: str):
         """
         Extracts an unvalidated JSON web token from the given "Authorization"
         header value.
@@ -112,7 +108,7 @@ class Auth0Authentication(authentication.BaseAuthentication):
 
         return parts[1]
 
-    def get_user(self, claims: dict):
+    def get_user(self, claims: dict) -> UserModel:
         try:
             sub = claims['sub']
             sub_list = sub.split('|')
@@ -129,6 +125,15 @@ class Auth0Authentication(authentication.BaseAuthentication):
             return UserModel.objects.get(auth0=user_id)
         except (UserModel.DoesNotExist, KeyError):
             return None
+
+    @staticmethod
+    def check_user_agent(user_agent: str) -> None:
+        try:
+            proceed_user_agent(user_agent)
+        except ValueError as e:
+            if settings.USER_AGENT_STRICT:
+                return ValidationError({"error": str(e)})
+            logger.warning(str(e))
 
 
 class Auth0ServiceAuthentication(Auth0Authentication):
