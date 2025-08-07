@@ -158,6 +158,36 @@ def touch_db_with_dict_response(query, dbp, params=None, save=False, returning=F
         raise Exception(f'ERR touch_db_with_dict_response: {str(err)}')
 
 
+def touch_db_with_connection(connection, query, params=None, save=False, returning=False,
+                             transaction=False, dict_response: bool = True):
+    extras.register_default_jsonb(connection.connection, globally=False)
+    try:
+        with connection.cursor() as cursor:
+            if not transaction:
+                cursor.execute(query, params)
+            else:
+                for part in query:
+                    cursor.execute(part)
+            if save:
+                connection.commit()
+                if returning:
+                    if dict_response:
+                        columns = [col[0] for col in cursor.description]
+                        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                    else:
+                        return cursor.fetchall()
+                else:
+                    return True
+            else:
+                if dict_response:
+                    columns = [col[0] for col in cursor.description]
+                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                else:
+                    return cursor.fetchall()
+    except psycopg2.Error as err:
+        raise Exception(f'ERR touch_db_with_dict_response: {str(err)}')
+
+
 def get_current_datetime():
     return datetime.datetime.now(pytz.timezone('UTC')).replace(microsecond=0, tzinfo=None)
 
