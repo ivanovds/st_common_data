@@ -445,6 +445,34 @@ class MasterSlavesRedis:
                         await asyncio.sleep(retry_delay)
             return wrapper
         return decorator
+    
+    async def aclose(self):
+        """
+        Close all async Redis connections properly.
+        Should be called when finished with the client.
+        """
+        try:
+            if hasattr(self, 'async_master') and self.async_master:
+                await self.async_master.aclose()
+            if (hasattr(self, 'async_slaves') and 
+                self.async_slaves and 
+                self.async_slaves is not self.async_master):
+                await self.async_slaves.aclose()
+        except Exception as e:
+            logger.error(f"Error closing async Redis connections: {e}")
+
+    async def __aenter__(self):
+        """
+        Async context manager entry.
+        """
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Async context manager exit.
+        Ensures connections are closed properly.
+        """
+        await self.aclose()
 
     def get(self, key: str, ex: Optional[int] = None, px: Optional[int] = None, exat: Optional[int] = None, pxat: Optional[int] = None, persist: bool = False, use_master: bool = False) -> Any:
         """
