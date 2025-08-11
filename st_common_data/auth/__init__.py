@@ -1,11 +1,11 @@
 import datetime
 import requests
 import json
-import redis
 import re
 import logging
 from typing import Optional, Type
 from urllib.request import urlopen
+from st_common_data.redis import MasterSlavesRedis
 
 logger = logging.getLogger(__name__)
 
@@ -99,8 +99,8 @@ class ServiceAuth0Token(metaclass=SingletonMeta):
 
     @property
     def token(self):
-        redis_client = redis.Redis.from_url(self.redi_url)
-        raw_data = redis_client.get(name=self.token_name)
+        redis_client = MasterSlavesRedis.from_url(self.redi_url)
+        raw_data = redis_client.get(self.token_name)
         if raw_data:
             data = json.loads(raw_data)
             token = data['token']
@@ -124,7 +124,7 @@ class ServiceAuth0Token(metaclass=SingletonMeta):
             'expiration_time': expiration.strftime('%Y-%m-%d %H:%M:%S %Z')
         }
 
-        redis_client = redis.Redis.from_url(self.redi_url)
+        redis_client = MasterSlavesRedis.from_url(self.redi_url)
         redis_client.set(self.token_name, json.dumps(data))
 
         return token
