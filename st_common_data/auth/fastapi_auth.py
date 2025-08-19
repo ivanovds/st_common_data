@@ -114,9 +114,9 @@ class Auth0Authentication:
                 return ValidationError({"error": str(e)})
             logger.warning(str(e))
 
-        if 'sub' in claims:
+        try:
             auth0_id = claims['sub'].split('|')[1]
-        else:
+        except Exception:
             auth0_id = 'service_token'
         logger.info(f"Request to '{request.url.path}' from '{user_agent}' {auth0_id}")
 
