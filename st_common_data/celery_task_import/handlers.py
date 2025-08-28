@@ -18,6 +18,8 @@ class CeleryTaskFormator:
 
         # Plain type like int, str, dict
         if origin is None:
+            if type_entityn is type(None):
+                return "None"
             return getattr(type_entityn, "__name__", str(type_entityn))
 
         return f"{origin.__name__}[{', '.join(self.get_argument_type(a) for a in args)}]"
