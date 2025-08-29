@@ -1,11 +1,11 @@
 class CeleryRouter:
     def db_for_read(self, model, **hints):
-        if model._meta.app_label == 'django_celery_results':
+        if model._meta.app_label in ['django_celery_results', 'django_celery_beat']:
             return 'celery'
         return None
 
     def db_for_write(self, model, **hints):
-        if model._meta.app_label == 'django_celery_results':
+        if model._meta.app_label in ['django_celery_results', 'django_celery_beat']:
             return 'celery'
         return None
 
@@ -13,6 +13,6 @@ class CeleryRouter:
         return None  # allow default behavior
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
-        if app_label == 'django_celery_results':
+        if app_label in ['django_celery_results', 'django_celery_beat']:
             return db == 'celery'
         return None
