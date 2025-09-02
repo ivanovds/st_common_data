@@ -1,6 +1,7 @@
 import inspect
 from celery import current_app
-from typing import get_origin, get_args
+from typing import get_origin, get_args, Union
+from types import UnionType
 
 
 class CeleryTaskFormator:
@@ -21,6 +22,9 @@ class CeleryTaskFormator:
             if type_entityn is type(None):
                 return "None"
             return getattr(type_entityn, "__name__", str(type_entityn))
+
+        if origin is UnionType:
+            origin = Union
 
         return f"{origin.__name__}[{', '.join(self.get_argument_type(a) for a in args)}]"
 
