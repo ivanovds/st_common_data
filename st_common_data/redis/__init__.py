@@ -20,7 +20,7 @@ class MasterSlavesRedis:
     All write operations are done through master, while read operations can be done through slaves.
     Automatically detects if connected to a slave and finds the master.
     """
-    
+
     def __init__(
         self,
         host: Union[str, List[Tuple[str, int]]],
@@ -36,7 +36,7 @@ class MasterSlavesRedis:
     ):
         """
         Initialize MasterSlavesRedis client.
-        
+
         Args:
             host: Redis host (string) or list of (host, port) tuples for cluster mode
             port: Redis port (not used in cluster mode)
@@ -56,12 +56,12 @@ class MasterSlavesRedis:
         self.socket_connect_timeout = socket_connect_timeout
         self.retry_on_timeout = retry_on_timeout
         self.kwargs = kwargs
-        
+
         # Initialize Redis client based on mode
         if cluster_mode:
             if isinstance(host, str):
                 raise ValueError("Cluster mode requires a list of (host, port) tuples")
-                
+
             self.cluster = RedisCluster(
                 startup_nodes=host,
                 password=password,
@@ -71,15 +71,15 @@ class MasterSlavesRedis:
                 retry_on_timeout=retry_on_timeout,
                 **kwargs
             )
-            
+
             self.master = self.cluster
             self.slaves = self.cluster
-            
+
         else:
             if isinstance(host, list):
                 # If host is a list, use the first element
                 host, port = host[0]
-            
+
             initial_client = redis.Redis(
                 host=host,
                 port=port,
@@ -91,12 +91,12 @@ class MasterSlavesRedis:
                 decode_responses=decode_responses,
                 **kwargs
             )
-            
+
             try:
                 replication_info = initial_client.info(section='replication')
                 if replication_info['role'] == 'slave':
                     logger.info(f"Connected to slave, switching to master at {replication_info['master_host']}:{replication_info['master_port']}")
-                    
+
                     self.master = redis.Redis(
                         host=replication_info['master_host'],
                         port=replication_info['master_port'],
@@ -108,7 +108,7 @@ class MasterSlavesRedis:
                         decode_responses=decode_responses,
                         **kwargs
                     )
-                    
+
                     self.slaves = initial_client
                 else:
                     self.master = initial_client
@@ -117,35 +117,35 @@ class MasterSlavesRedis:
                 logger.warning(f"Failed to check Redis role, using as both master and slave: {e}")
                 self.master = initial_client
                 self.slaves = initial_client
-        
+
         self.async_master = None
         self.async_slaves = None
-    
+
     @classmethod
     def from_url(cls, url, **kwargs):
         """
         Create MasterSlavesRedis instance from Redis URL.
-        
+
         Args:
             url: Redis URL in format redis://[[username]:[password]]@host:port/db
                  or rediss:// for SSL connection
                  Query parameters can include ssl_cert_reqs=none
             **kwargs: Additional arguments to pass to Redis client
-        
+
         Returns:
             MasterSlavesRedis instance
         """
         connection_params = redis.connection.parse_url(url)
-        
+
         host = connection_params.pop('host')
         port = connection_params.pop('port')
         db = connection_params.pop('db')
         password = connection_params.pop('password', None)
-        
+
         ssl_enabled = url.startswith('rediss://')
         if ssl_enabled:
             connection_params['ssl'] = True
-        
+
         ssl_cert_reqs = connection_params.pop('ssl_cert_reqs', None)
         if ssl_cert_reqs is not None:
             if ssl_cert_reqs.lower() == 'none':
@@ -156,10 +156,10 @@ class MasterSlavesRedis:
                 connection_params['ssl_cert_reqs'] = ssl.CERT_REQUIRED
         elif ssl_enabled and 'ssl_cert_reqs' not in kwargs:
             connection_params['ssl_cert_reqs'] = ssl.CERT_NONE
-        
+
         if 'connection_class' in connection_params:
             connection_params.pop('connection_class')
-        
+
         return cls(
             host=host,
             port=port,
@@ -167,7 +167,7 @@ class MasterSlavesRedis:
             password=password,
             **{**connection_params, **kwargs}
         )
-    
+
     async def init_async(self):
         """
         Initialize async Redis clients.
@@ -176,18 +176,18 @@ class MasterSlavesRedis:
         if self.async_master is None or self.async_slaves is None:
             master_host = self.master.connection_pool.connection_kwargs['host']
             master_port = self.master.connection_pool.connection_kwargs['port']
-            
+
             ssl_enabled = self.kwargs.get('ssl', False)
             master_url = f"rediss://" if ssl_enabled else f"redis://"
-            
+
             if self.password:
                 master_url += f":{self.password}@"
             master_url += f"{master_host}:{master_port}/{self.db}"
-            
+
             async_kwargs = self.kwargs.copy()
             if ssl_enabled:
                 async_kwargs.pop('ssl', None)
-            
+
             self.async_master = aioredis.from_url(
                 master_url,
                 decode_responses=self.decode_responses,
@@ -195,17 +195,17 @@ class MasterSlavesRedis:
                 socket_connect_timeout=self.socket_connect_timeout,
                 **async_kwargs
             )
-            
+
             if self.slaves is not self.master:
                 slave_host = self.slaves.connection_pool.connection_kwargs['host']
                 slave_port = self.slaves.connection_pool.connection_kwargs['port']
-                
+
                 slave_url = f"rediss://" if ssl_enabled else f"redis://"
-                
+
                 if self.password:
                     slave_url += f":{self.password}@"
                 slave_url += f"{slave_host}:{slave_port}/{self.db}"
-                
+
                 self.async_slaves = aioredis.from_url(
                     slave_url,
                     decode_responses=self.decode_responses,
@@ -215,18 +215,18 @@ class MasterSlavesRedis:
                 )
             else:
                 self.async_slaves = self.async_master
-            
+
             try:
                 replication_info = await self.async_master.info(section='replication')
                 if replication_info['role'] == 'slave':
                     logger.info(f"Async connected to slave, switching to master at {replication_info['master_host']}:{replication_info['master_port']}")
-                    
+
                     master_url = f"rediss://" if ssl_enabled else f"redis://"
-                    
+
                     if self.password:
                         master_url += f":{self.password}@"
                     master_url += f"{replication_info['master_host']}:{replication_info['master_port']}/{self.db}"
-                    
+
                     self.async_master = aioredis.from_url(
                         master_url,
                         decode_responses=self.decode_responses,
@@ -236,17 +236,17 @@ class MasterSlavesRedis:
                     )
             except Exception as e:
                 logger.warning(f"Failed to check async Redis role: {e}")
-    
+
     def _get_client(self, use_master: bool = False):
         """Get appropriate Redis client based on use_master flag"""
         return self.master if use_master else self.slaves
-    
+
     async def _get_async_client(self, use_master: bool = False):
         """Get appropriate async Redis client based on use_master flag"""
         if self.async_master is None:
             await self.init_async()
         return self.async_master if use_master else self.async_slaves
-    
+
     @classmethod
     def _create_read_method(cls, method_name: str):
         """Create a read method that delegates to the appropriate client"""
@@ -254,7 +254,7 @@ class MasterSlavesRedis:
             client = self._get_client(use_master)
             return getattr(client, method_name)(*args, **kwargs)
         return method
-    
+
     @classmethod
     def _create_async_read_method(cls, method_name: str):
         """Create an async read method that delegates to the appropriate client"""
@@ -262,7 +262,7 @@ class MasterSlavesRedis:
             client = await self._get_async_client(use_master)
             return await getattr(client, method_name)(*args, **kwargs)
         return method
-    
+
     @classmethod
     def _create_write_method(cls, method_name: str):
         """Create a write method with reconnection support"""
@@ -270,7 +270,7 @@ class MasterSlavesRedis:
         def method(self, *args, **kwargs):
             return getattr(self.master, method_name)(*args, **kwargs)
         return method
-    
+
     @classmethod
     def _create_async_write_method(cls, method_name: str):
         """Create an async write method with reconnection support"""
@@ -280,11 +280,11 @@ class MasterSlavesRedis:
                 await self.init_async()
             return await getattr(self.async_master, method_name)(*args, **kwargs)
         return method
-    
+
     def reconnect_master(self):
         """
         Reconnect to the Redis master.
-        
+
         Returns:
             True if reconnection was successful, False otherwise
         """
@@ -305,7 +305,7 @@ class MasterSlavesRedis:
                 # If slaves is the same as master, use the current connection info
                 master_host = self.master.connection_pool.connection_kwargs['host']
                 master_port = self.master.connection_pool.connection_kwargs['port']
-            
+
             # Create a new Redis client for the master
             self.master = redis.Redis(
                 host=master_host,
@@ -318,7 +318,7 @@ class MasterSlavesRedis:
                 decode_responses=self.decode_responses,
                 **self.kwargs
             )
-            
+
             # Test the connection
             self.master.ping()
             logger.info(f"Successfully reconnected to master at {master_host}:{master_port}")
@@ -330,7 +330,7 @@ class MasterSlavesRedis:
     async def areconnect_master(self):
         """
         Async reconnect to the Redis master.
-        
+
         Returns:
             True if reconnection was successful, False otherwise
         """
@@ -357,18 +357,18 @@ class MasterSlavesRedis:
                 # If slaves is the same as master, use the current connection info
                 master_host = self.master.connection_pool.connection_kwargs['host']
                 master_port = self.master.connection_pool.connection_kwargs['port']
-            
+
             ssl_enabled = self.kwargs.get('ssl', False)
             master_url = f"rediss://" if ssl_enabled else f"redis://"
-            
+
             if self.password:
                 master_url += f":{self.password}@"
             master_url += f"{master_host}:{master_port}/{self.db}"
-            
+
             async_kwargs = self.kwargs.copy()
             if ssl_enabled:
                 async_kwargs.pop('ssl', None)
-            
+
             self.async_master = aioredis.from_url(
                 master_url,
                 decode_responses=self.decode_responses,
@@ -376,7 +376,7 @@ class MasterSlavesRedis:
                 socket_connect_timeout=self.socket_connect_timeout,
                 **async_kwargs
             )
-            
+
             await self.async_master.ping()
             logger.info(f"Successfully reconnected to async master at {master_host}:{master_port}")
             return True
@@ -388,11 +388,11 @@ class MasterSlavesRedis:
     def reconnect_on_error(max_retries=3, retry_delay=1):
         """
         Decorator for Redis methods to handle connection errors by reconnecting.
-        
+
         Args:
             max_retries: Maximum number of reconnection attempts
             retry_delay: Delay between retries in seconds
-            
+
         Returns:
             Decorated function
         """
@@ -408,7 +408,7 @@ class MasterSlavesRedis:
                         if retries >= max_retries:
                             logger.error(f"Failed to execute {func.__name__} after {max_retries} retries: {e}")
                             raise
-                        
+
                         logger.warning(f"Connection error in {func.__name__}, reconnecting (attempt {retries}/{max_retries}): {e}")
                         self.reconnect_master()
                         time.sleep(retry_delay)
@@ -419,11 +419,11 @@ class MasterSlavesRedis:
     def areconnect_on_error(max_retries=3, retry_delay=1):
         """
         Async decorator for Redis methods to handle connection errors by reconnecting.
-        
+
         Args:
             max_retries: Maximum number of reconnection attempts
             retry_delay: Delay between retries in seconds
-            
+
         Returns:
             Decorated async function
         """
@@ -439,13 +439,13 @@ class MasterSlavesRedis:
                         if retries >= max_retries:
                             logger.error(f"Failed to execute {func.__name__} after {max_retries} retries: {e}")
                             raise
-                        
+
                         logger.warning(f"Connection error in {func.__name__}, reconnecting (attempt {retries}/{max_retries}): {e}")
                         await self.areconnect_master()
                         await asyncio.sleep(retry_delay)
             return wrapper
         return decorator
-    
+
     async def aclose(self):
         """
         Close all async Redis connections properly.
@@ -454,8 +454,8 @@ class MasterSlavesRedis:
         try:
             if hasattr(self, 'async_master') and self.async_master:
                 await self.async_master.aclose()
-            if (hasattr(self, 'async_slaves') and 
-                self.async_slaves and 
+            if (hasattr(self, 'async_slaves') and
+                self.async_slaves and
                 self.async_slaves is not self.async_master):
                 await self.async_slaves.aclose()
         except Exception as e:
@@ -477,7 +477,7 @@ class MasterSlavesRedis:
     def get(self, key: str, ex: Optional[int] = None, px: Optional[int] = None, exat: Optional[int] = None, pxat: Optional[int] = None, persist: bool = False, use_master: bool = False) -> Any:
         """
         Get value by key.
-        
+
         Args:
             key: Redis key
             ex: Expiry time in seconds
@@ -486,20 +486,21 @@ class MasterSlavesRedis:
             pxat: Absolute expiry time in milliseconds since epoch
             persist: Whether to persist the key
             use_master: Whether to use master for read operation
-            
+
         Returns:
             Value stored in Redis
         """
-        client = self._get_client(use_master)
         if ex or px or exat or pxat or persist:
+            client = self._get_client(use_master=True)
             return client.getex(key, ex=ex, px=px, exat=exat, pxat=pxat, persist=persist)
         else:
+            client = self._get_client(use_master=use_master)
             return client.get(key)
-    
+
     async def aget(self, key: str, ex: Optional[int] = None, px: Optional[int] = None, exat: Optional[int] = None, pxat: Optional[int] = None, persist: bool = False, use_master: bool = False) -> Any:
         """
         Async get value by key.
-        
+
         Args:
             key: Redis key
             ex: Expiry time in seconds
@@ -508,45 +509,46 @@ class MasterSlavesRedis:
             pxat: Absolute expiry time in milliseconds since epoch
             persist: Whether to persist the key
             use_master: Whether to use master for read operation
-            
+
         Returns:
             Value stored in Redis
         """
-        client = await self._get_async_client(use_master)
         if ex or px or exat or pxat or persist:
+            client = await self._get_async_client(use_master=True)
             return await client.getex(key, ex=ex, px=px, exat=exat, pxat=pxat, persist=persist)
         else:
+            client = await self._get_async_client(use_master=use_master)
             return await client.get(key)
-    
+
     @reconnect_on_error()
     def set(self, key: str, value: Any, ex: Optional[int] = None, nx: bool = False, xx: bool = False) -> bool:
         """
         Set value by key.
-        
+
         Args:
             key: Redis key
             value: Value to store
             ex: Expiry time in seconds
             nx: Only set the key if it does not already exist
             xx: Only set the key if it already exists
-            
+
         Returns:
             True if successful
         """
         return self.master.set(key, value, ex=ex, nx=nx, xx=xx)
-    
+
     @areconnect_on_error()
     async def aset(self, key: str, value: Any, ex: Optional[int] = None, nx: bool = False, xx: bool = False) -> bool:
         """
         Async set value by key.
-        
+
         Args:
             key: Redis key
             value: Value to store
             ex: Expiry time in seconds
             nx: Only set the key if it does not already exist
             xx: Only set the key if it already exists
-            
+
         Returns:
             True if successful
         """
@@ -560,7 +562,7 @@ def add_redis_methods(cls):
     for method_name in ['mget', 'hget', 'hgetall', 'lrange', 'smembers', 'exists', 'ttl', 'keys', 'info']:
         setattr(cls, method_name, cls._create_read_method(method_name))
         setattr(cls, f'a{method_name}', cls._create_async_read_method(method_name))
-    
+
     for method_name in ['mset', 'hset', 'lpush', 'rpush', 'lpop', 'rpop', 'sadd', 'delete', 'expire', 'incr', 'decr']:
         setattr(cls, method_name, cls._create_write_method(method_name))
         setattr(cls, f'a{method_name}', cls._create_async_write_method(method_name))
