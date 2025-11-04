@@ -160,7 +160,11 @@ def touch_db_with_dict_response(query, dbp, params=None, save=False, returning=F
 
 def touch_db_with_connection(connection, query, params=None, save=False, returning=False,
                              transaction=False, dict_response: bool = True):
-    extras.register_default_jsonb(connection.connection, globally=False)
+    extras.register_default_jsonb(
+        connection.connection,
+        globally=False,
+        loads=lambda x: x,
+    )
     try:
         with connection.cursor() as cursor:
             if not transaction:
