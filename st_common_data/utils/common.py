@@ -39,7 +39,7 @@ def make_project_info_dict() -> dict[str, str]:
         version, environment = VERSION.split("-")
     except ValueError:
         version, environment = "1.0.0", "test"
-        logger.error(f"Unsupported version of project: {VERSION}")
+        logger.warning(f"Unsupported version of project: {VERSION}")
     return {
         "name": PROJECT_NAME,
         "version": version,
@@ -102,7 +102,7 @@ def http_request(
             if msk_callback:
                 msk_callback(text=error_message)
             logger.error(error_message)
-            raise Exception(f'{url} returned with {response.status_code} status code, details:  {response.text}')
+            response.raise_for_status()
     else:
         if raw_data:
             result = response.content
