@@ -1,6 +1,5 @@
 from __future__ import annotations
 import time
-from sqlalchemy.engine.url import make_url
 from typing import TypedDict
 
 import psycopg2
@@ -8,6 +7,7 @@ from psycopg2 import Error as PsycopgError
 
 from st_common_data.health.base import AbstractComponentHealthHandler
 from st_common_data.exceptions import UnhealthComponentError
+from st_common_data.utils.db import parse_url
 
 
 __all__ = ("PostgresHealthHandler",)
@@ -49,7 +49,7 @@ class PostgresHealthHandler(AbstractComponentHealthHandler):
 
     @classmethod
     def from_url(cls, url: str) -> PostgresHealthHandler:
-        result = make_url(url)
+        result = parse_url(url)
         return cls(
             user=result.username,  # type: ignore
             password=result.password,  # type: ignore
