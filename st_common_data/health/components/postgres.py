@@ -48,7 +48,11 @@ class PostgresHealthHandler(AbstractComponentHealthHandler):
         self.host = host
 
     @classmethod
-    def from_url(cls, url: str) -> PostgresHealthHandler:
+    def from_url(
+        cls,
+        url: str,
+        name: str | None = None,
+    ) -> PostgresHealthHandler:
         result = parse_url(url)
         return cls(
             user=result.username,  # type: ignore
@@ -56,16 +60,22 @@ class PostgresHealthHandler(AbstractComponentHealthHandler):
             host=result.host,  # type: ignore
             port=result.port,  # type: ignore
             database=result.database,  # type: ignore
+            name=name,
         )
 
     @classmethod
-    def from_connection_dict(cls, connection_dict: ConnectionDictType) -> PostgresHealthHandler:
+    def from_connection_dict(
+        cls,
+        connection_dict: ConnectionDictType,
+        name: str | None = None,
+    ) -> PostgresHealthHandler:
         return cls(
             user=connection_dict["USER"],
             password=connection_dict["PASSWORD"],
             host=connection_dict["HOST"],
             port=connection_dict["PORT"],
             database=connection_dict["NAME"],
+            name=name,
         )
 
     def ping(self) -> None:
