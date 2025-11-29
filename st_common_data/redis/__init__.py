@@ -556,6 +556,28 @@ class MasterSlavesRedis:
             await self.init_async()
         return await self.async_master.set(key, value, ex=ex, nx=nx, xx=xx)
 
+    @reconnect_on_error()
+    def ping(self) -> bool:
+        """
+        Ping the Redis server to test connectivity.
+
+        Sends a PING command to the Redis server and returns True if the server
+        responds with "PONG".
+        """
+        return self.master.ping()
+
+    @areconnect_on_error()
+    async def aping(self) -> bool:
+        """
+        Ping the Redis server to test connectivity.
+
+        Sends a PING command to the Redis server and returns True if the server
+        responds with "PONG".
+        """
+        if self.async_master is None:
+            await self.init_async()
+        return self.async_master.ping()
+
 #TODO: in the future, add this methods into the class
 def add_redis_methods(cls):
     """Add basic methods to Redis class"""

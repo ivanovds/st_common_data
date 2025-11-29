@@ -1,6 +1,7 @@
 import time
 
-from redis import Redis, exceptions as redis_exceptions
+from redis import exceptions as redis_exceptions
+from st_common_data.redis import MasterSlavesRedis
 
 from st_common_data.health.base import AbstractComponentHealthHandler
 from st_common_data.exceptions import UnhealthComponentError
@@ -10,12 +11,12 @@ __all__ = ("RedisHealthHandler",)
 
 
 class RedisHealthHandler(AbstractComponentHealthHandler):
-    client: Redis
+    client: MasterSlavesRedis
     name = "redis"
 
     def __init__(self, url: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.client = Redis.from_url(
+        self.client = MasterSlavesRedis.from_url(
             url,
             socket_connect_timeout=2,
             socket_timeout=2,

@@ -10,7 +10,7 @@ from st_common_data.exceptions import UnhealthComponentError
 from st_common_data.utils.db import parse_url
 
 
-__all__ = ("PostgresHealthHandler",)
+__all__ = ("PostgresHealthHandler", "ReadOnlyPostgresHealthHandler",)
 
 
 class ConnectionDictType(TypedDict):
@@ -21,7 +21,7 @@ class ConnectionDictType(TypedDict):
     NAME: str
 
 
-class PostgresHealthHandler(AbstractComponentHealthHandler):
+class AbstractPostgresHealthHanlder(AbstractComponentHealthHandler):
     name = "postgres"
 
     user: str
@@ -92,6 +92,20 @@ class PostgresHealthHandler(AbstractComponentHealthHandler):
                     cur.fetchone()
         except PsycopgError as e:
             raise UnhealthComponentError(e)
+
+
+class ReadOnlyPostgresHealthHandler(AbstractPostgresHealthHanlder):
+    def check_startup(self) -> None:
+        self.ping()
+
+    def check_live(self) -> None:
+        self.ping()
+
+    def check_ready(self) -> None:
+        self.ping()
+
+
+class PostgresHealthHandler(AbstractComponentHealthHandler):
 
     def check_write_read(self) -> None:
         try:
