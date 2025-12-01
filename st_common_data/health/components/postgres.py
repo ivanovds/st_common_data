@@ -105,7 +105,7 @@ class ReadOnlyPostgresHealthHandler(AbstractPostgresHealthHanlder):
         self.ping()
 
 
-class PostgresHealthHandler(AbstractComponentHealthHandler):
+class PostgresHealthHandler(AbstractPostgresHealthHanlder):
 
     def check_write_read(self) -> None:
         try:
