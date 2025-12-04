@@ -1,7 +1,7 @@
+from typing import Callable
 from functools import partial
 
-from django.http import HttpRequest, JsonResponse, HttpResponse
-from django.urls import path
+from django.http import JsonResponse, HttpResponse
 from rest_framework import status
 
 from .base import (
@@ -9,34 +9,47 @@ from .base import (
 )
 
 
-__all__ = ("get_url_pattern",)
+__all__ = ("get_middleware",)
 
 
-def health_view(
+path_type_mapper: dict[str, HealthTypesType] = {
+    "/health/ready/": "ready",
+    "/health/live/": "live",
+    "/health/startup/": "startup",
+}
+
+
+def health_middleware(
     health_handler: HealthHandler,
-    request: HttpRequest,
-    type_: HealthTypesType,
-    *args,
-    **kwargs,
+    get_response,
 ) -> JsonResponse:
-    function = health_handler.get_method_by_type(type_)
-    display = request.GET.get("display", False)
+    def inner(request):
+        # remove after gcp migration
+        if request.path == "/health":
+            return JsonResponse(status=status.HTTP_200_OK, data={"ok": True})
 
-    status_ = function()
+        if request.path not in path_type_mapper.keys():
+            return get_response(request)
 
-    if status_["status"] == HEALTH_STATUS.UNHEALTHY.value:
+        function = health_handler.get_method_by_type(path_type_mapper[request.path])
+        display = request.GET.get("display", False)
+
+        status_ = function()
+
+        if status_["status"] == HEALTH_STATUS.UNHEALTHY.value:
+            if display:
+                return JsonResponse(status=status.HTTP_503_SERVICE_UNAVAILABLE, data=status_)
+            else:
+                return HttpResponse(status=status.HTTP_503_SERVICE_UNAVAILABLE)
         if display:
-            return JsonResponse(status=status.HTTP_503_SERVICE_UNAVAILABLE, data=status_)
+            return JsonResponse(status=status.HTTP_200_OK, data=status_)
         else:
-            return HttpResponse(status=status.HTTP_503_SERVICE_UNAVAILABLE)
-    if display:
-        return JsonResponse(status=status.HTTP_200_OK, data=status_)
-    else:
-        return HttpResponse(status=status.HTTP_200_OK)
-    
+            return HttpResponse(status=status.HTTP_200_OK)
 
-def get_url_pattern(
+    return inner
+
+
+def get_middleware(
     health_handler: HealthHandler,
-) -> path:
-    return path("health/<str:type_>/", partial(health_view, health_handler))
-
+) -> Callable:
+    return partial(health_middleware, health_handler)
