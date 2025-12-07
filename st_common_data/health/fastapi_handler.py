@@ -33,6 +33,9 @@ def implement_health_endpoint(
     health_handler: HealthHandler,
     app: FastAPI,
 ) -> None:
+    # Remove after migration to GCP
+    app.get("/health/")(lambda: JSONResponse(status_code=status.HTTP_200_OK, content={"ok": True}))
+
     app.get("/health/{type_}/")(partial(health_controller, health_handler))
 
 
