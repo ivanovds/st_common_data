@@ -81,8 +81,8 @@ class Auth0Authentication(authentication.BaseAuthentication):
         user = self.get_user(claims)
 
         self.check_user_agent(user_agent)
-        logger.info(f"Request to '{request.path_info}' from '{user_agent}' "
-                    f"{user.auth0 if isinstance(user, UserModel) else user.__class__.__name__}")
+        # logger.info(f"Request to '{request.path_info}' from '{user_agent}' "
+                    # f"{user.auth0 if isinstance(user, UserModel) else user.__class__.__name__}")
         if not user:
             return None
         else:

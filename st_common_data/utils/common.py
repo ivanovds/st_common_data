@@ -1,74 +1,56 @@
 import json
-import psycopg2
-from psycopg2 import extras
+from decimal import Decimal, ROUND_HALF_UP
+from dateutil.relativedelta import relativedelta
+from typing import Union, Callable
 import datetime
 import pytz
 import logging
 import time
+
 import requests
-from decimal import Decimal, ROUND_HALF_UP
-from dateutil.relativedelta import relativedelta
-from typing import Union, Callable
+import psycopg2
+from psycopg2 import extras
+
+from st_common_data.info.base import make_user_agent
+
 
 logger = logging.getLogger(__name__)
+
 
 try:
     from app.settings import config
     from st_common_data.auth.fastapi_auth import service_auth0_token
 
     DATUM_API_URL = config.datum_api_url
-    PROJECT_NAME = config.project_name
-    VERSION = config.version
-except Exception as e:
+except ImportError:
     try:
         from django.conf import settings
         from st_common_data.auth.django_auth import service_auth0_token
 
         DATUM_API_URL = settings.DATUM_API_URL
-        PROJECT_NAME = settings.PROJECT_NAME
-        VERSION = settings.VERSION
     except Exception:
         DATUM_API_URL = None
-        PROJECT_NAME = None
-        VERSION = None
+
 
 HOLIDAYS_LIST_CACHE = None
-
-
-def make_project_info_dict() -> dict[str, str]:
-    try:
-        version, environment = VERSION.split("-")
-    except ValueError:
-        version, environment = "1.0.0", "test"
-        logger.warning(f"Unsupported version of project: {VERSION}")
-    return {
-        "name": PROJECT_NAME,
-        "version": version,
-        "environment": environment,
-    }
-
-
-def make_user_agent() -> str:
-    info = make_project_info_dict()
-    return f"{info['name']}/{info['version']} {info['environment']}"
 
 
 def http_request(
         method: str,
         url: str,
-        bearer: str = None,
-        data: dict = None,
-        params: dict = None,
+        bearer: str | None = None,
+        data: dict | None = None,
+        params: dict | None = None,
         timeout: int = 30,
         retry: int = 0,
         retry_time: int = 10,
-        error_msg_prefix: str = None,
+        error_msg_prefix: str | None = None,
         raw_data: bool = False,
-        headers: dict = None,
+        headers: dict | None = None,
         verify_sert: bool = True,
-        proxies: dict = None,
+        proxies: dict | None = None,
         multipart_form_data: bool = False,
-        msk_callback: Callable = None
+        msk_callback: Callable | None = None
 ):
     variables = locals()
 
