@@ -1,3 +1,5 @@
+from typing import Callable
+
 from opentelemetry.sdk.resources import Resource
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -12,23 +14,8 @@ from .instrumentator import CustomCeleryInstrumentor
 __all__ = ("setup_telemetry", )
 
 
-_WORKER_POSTFIX = "-worker"
-
-
-def init_telemetry_in_worker(**kwargs) -> None:
-    resource = Resource.create({"service.name": settings.PROJECT_NAME + _WORKER_POSTFIX})
-
-    provider = TracerProvider(resource=resource)
-    trace.set_tracer_provider(provider)
-
-    CustomCeleryInstrumentor().instrument()
-    DjangoInstrumentor().instrument()
-    LoggingInstrumentor().instrument(set_logging_format=False)
-    RequestsInstrumentor().instrument()
-
-
-def setup_telemetry(app: Celery) -> None:
+def setup_telemetry(app: Celery, init_function: Callable[None, None]) -> None:
     app.conf.update(
         worker_hijack_root_logger=False,
     )
-    signals.celeryd_init.connect(init_telemetry_in_worker, weak=False)
+    signals.celeryd_init.connect(lambda **: init_function(), weak=False)
