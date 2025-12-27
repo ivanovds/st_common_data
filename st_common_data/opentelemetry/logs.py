@@ -5,12 +5,13 @@ import traceback
 from datetime import datetime, timezone
 
 from opentelemetry import trace
-from django.conf import settings
 
 from st_common_data.info.base import make_project_info_dict
+from st_common_data.utils.settings import get_settings
 
 
 tracer = trace.get_tracer(__name__)
+settings = get_settings()
 
 
 __all__ = ("JsonFormatter", "CeleryFilter",)
@@ -36,12 +37,14 @@ class JsonFormatter(logging.Formatter):
             "body": record.getMessage(),
             "traceId": trace_id,
             "spanId": span_id,
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+
             "attributes": {
                 "file": record.pathname,
                 "line": record.lineno,
                 "func": record.funcName,
-                "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             },
+
             "resource": {
                 "attributes": {
                     "service.name": info["name"],
