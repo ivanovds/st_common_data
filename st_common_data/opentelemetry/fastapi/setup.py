@@ -1,4 +1,5 @@
 import logging
+from functools import partial
 
 from fastapi import FastAPI
 from opentelemetry.sdk.resources import Resource
@@ -25,7 +26,7 @@ _WORKER_POSTFIX = "-worker"
 _OTL_METRICS_HOST = "otl_metrics_host"
 
 
-def setup_telemetry(app: FastAPI, service_name: str | None = Nono):
+def setup_telemetry(app: FastAPI, service_name: str | None = None):
     resource = Resource.create({"service.name": service_name or settings.project_name})
     provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(provider)

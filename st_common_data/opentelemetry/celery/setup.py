@@ -4,9 +4,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from opentelemetry.instrumentation.django import DjangoInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
-from django.conf import settings
 from celery import signals, Celery
 
 from .instrumentator import CustomCeleryInstrumentor
