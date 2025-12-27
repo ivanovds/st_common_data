@@ -18,4 +18,4 @@ def setup_telemetry(app: Celery, init_function: Callable[None, None]) -> None:
     app.conf.update(
         worker_hijack_root_logger=False,
     )
-    signals.celeryd_init.connect(lambda **: init_function(), weak=False)
+    signals.celeryd_init.connect(lambda **_: init_function(), weak=False)
