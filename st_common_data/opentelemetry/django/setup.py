@@ -31,7 +31,9 @@ def setup_telemetry(service_name: str | None = None) -> None:
     trace.set_tracer_provider(provider)
 
     LoggingInstrumentor().instrument(set_logging_format=False)
-    DjangoInstrumentor().instrument()
+    DjangoInstrumentor().instrument(
+        middleware_position=3, # to be after info and health middleware
+    )
     CustomCeleryInstrumentor().instrument()
     RequestsInstrumentor().instrument()
     Psycopg2Instrumentor().instrument()
