@@ -6,7 +6,6 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.django import DjangoInstrumentor
-from opentelemetry.instrumentation.celery import CeleryInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from django.conf import settings
 from celery import Celery
@@ -15,6 +14,7 @@ from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 
 from st_common_data.opentelemetry.metrics import setup_metrics as _setup_metrics
 from st_common_data.opentelemetry.celery.setup import setup_telemetry as setup_celery_telemetry
+from st_common_data.opentelemetry.celery.instrumentator import CustomCeleryInstrumentor
 
 
 __all__ = ("setup_telemetry", "setup_metrics", "setup_celery",)
@@ -32,12 +32,10 @@ def setup_telemetry(service_name: str | None = None) -> None:
 
     LoggingInstrumentor().instrument(set_logging_format=False)
     DjangoInstrumentor().instrument()
-    CeleryInstrumentor().instrument()
+    CustomCeleryInstrumentor().instrument()
     RequestsInstrumentor().instrument()
     Psycopg2Instrumentor().instrument()
 
-
-def setup_metrics() -> None:
     _setup_metrics(_OTL_METRICS_HOST)
 
 
