@@ -36,21 +36,22 @@ HOLIDAYS_LIST_CACHE = None
 
 
 def http_request(
-        method: str,
-        url: str,
-        bearer: str | None = None,
-        data: dict | None = None,
-        params: dict | None = None,
-        timeout: int = 30,
-        retry: int = 0,
-        retry_time: int = 10,
-        error_msg_prefix: str | None = None,
-        raw_data: bool = False,
-        headers: dict | None = None,
-        verify_sert: bool = True,
-        proxies: dict | None = None,
-        multipart_form_data: bool = False,
-        msk_callback: Callable | None = None
+    method: str,
+    url: str,
+    bearer: str | None = None,
+    data: dict | None = None,
+    params: dict | None = None,
+    timeout: int = 30,
+    retry: int = 0,
+    retry_time: int = 10,
+    error_msg_prefix: str | None = None,
+    raw_data: bool = False,
+    headers: dict | None = None,
+    verify_sert: bool = True,
+    proxies: dict | None = None,
+    multipart_form_data: bool = False,
+    msk_callback: Callable | None = None,
+    log_errors: bool = True,
 ):
     variables = locals()
 
@@ -84,7 +85,8 @@ def http_request(
 
             if msk_callback:
                 msk_callback(text=error_message)
-            logger.error(error_message)
+            if log_errors:
+                logger.error(error_message)
             response.raise_for_status()
     else:
         if raw_data:
