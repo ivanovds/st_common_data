@@ -13,7 +13,6 @@ router = APIRouter(
 
 @router.get("/")
 async def root(
-    *,
 ):
     handler = CeleryTaskFormator(config.celery_task_default_queue)
     handler.run()
