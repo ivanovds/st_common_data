@@ -22,7 +22,7 @@ __all__ = ("setup_telemetry", "setup_metrics", "setup_celery",)
 logger = logging.getLogger(__name__)
 
 _WORKER_POSTFIX = "-worker"
-_OTL_METRICS_HOST = "OTL_METRICS_HOST"
+_OTL_METRICS_HOST = settings.OTL_METRICS_HOST 
 
 
 def setup_telemetry(service_name: str | None = None) -> None:
@@ -32,13 +32,13 @@ def setup_telemetry(service_name: str | None = None) -> None:
 
     LoggingInstrumentor().instrument(set_logging_format=False)
     DjangoInstrumentor().instrument(
-        middleware_position=3, # to be after info and health middleware
+        middleware_position=1, # to be after health middleware
     )
     CustomCeleryInstrumentor().instrument()
     RequestsInstrumentor().instrument()
     Psycopg2Instrumentor().instrument()
 
-    _setup_metrics(_OTL_METRICS_HOST)
+    _setup_metrics(_OTL_METRICS_HOST )
 
 
 def setup_celery(app: Celery) -> None:
