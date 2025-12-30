@@ -2,9 +2,9 @@ from fastapi import BackgroundTasks, Query, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi import APIRouter
 
-from st_common_data.auth.fastapi_auth import get_current_service
 from st_common_data.celery_task_import.handlers import CeleryTaskFormator
 from app.settings import config
+
 
 router = APIRouter(
     prefix='/api/import_tasks',
