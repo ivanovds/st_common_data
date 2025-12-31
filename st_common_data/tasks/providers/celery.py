@@ -53,6 +53,8 @@ class CeleryProvider(AbstractProvider):
         default_step: Any = None,
     ) -> tuple[Any, JsonType | None]:
         task_id = current_task.request.id
+        if not task_id:
+            return default_step, None
         try:
             step = http_request(
                 url=settings.CELERY_ADMIN_URL + f"tasks/steps/django/{task_id}/",
@@ -79,6 +81,9 @@ class CeleryProvider(AbstractProvider):
         data: JsonType | None = None,
     ) -> tuple[Any, JsonType | None]:
         task_id = current_task.request.id
+        if not task_id:
+            return step, data
+
         body = {
             "step": str(step),
             "data": data,
