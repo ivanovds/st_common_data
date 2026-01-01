@@ -12,6 +12,7 @@ import psycopg2
 from psycopg2 import extras
 
 from st_common_data.info.base import make_user_agent
+from st_common_data.auth import ServiceAuth0Token
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ HOLIDAYS_LIST_CACHE = None
 def http_request(
     method: str,
     url: str,
-    bearer: str | None = None,
+    bearer: str | ServiceAuth0Token | None = None,
     data: dict | None = None,
     params: dict | None = None,
     timeout: int = 30,
