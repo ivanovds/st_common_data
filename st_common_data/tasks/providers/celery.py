@@ -1,4 +1,5 @@
 import time
+import traceback
 from typing import Callable, Any
 
 from celery import shared_task, current_task
@@ -91,10 +92,10 @@ class CeleryProvider(AbstractProvider):
                 log_errors=False,
             )
         except HTTPError as e:
-            if e.response.status_code == status_codes.not_found:
-                return default_step, None
-            else:
-                raise e
+            if e.response.status_code != status_codes.not_found:
+                logger.error(traceback.format_exception_only(e))
+
+            return default_step, None
 
         step_ = step["step"]
         if step_mapper:
