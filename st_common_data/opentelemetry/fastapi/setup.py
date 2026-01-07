@@ -36,7 +36,7 @@ def _setup_telemetry(service_name: str | None = None) -> None:
     RequestsInstrumentor().instrument()
     Psycopg2Instrumentor().instrument()
 
-    _setup_metrics(_OTL_METRICS_HOST)
+    _setup_metrics(resource, _OTL_METRICS_HOST)
 
 
 def setup_telemetry(app: FastAPI, service_name: str | None = None):

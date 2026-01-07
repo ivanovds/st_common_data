@@ -17,7 +17,7 @@ from st_common_data.opentelemetry.celery.setup import setup_telemetry as setup_c
 from st_common_data.opentelemetry.celery.instrumentator import CustomCeleryInstrumentor
 
 
-__all__ = ("setup_telemetry", "setup_metrics", "setup_celery",)
+__all__ = ("setup_telemetry", "setup_celery",)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def setup_telemetry(service_name: str | None = None) -> None:
     RequestsInstrumentor().instrument()
     Psycopg2Instrumentor().instrument()
 
-    _setup_metrics(_OTL_METRICS_HOST )
+    _setup_metrics(resource, _OTL_METRICS_HOST )
 
 
 def setup_celery(app: Celery) -> None:
