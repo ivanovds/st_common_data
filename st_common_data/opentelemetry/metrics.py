@@ -1,7 +1,7 @@
 import logging
 
 from opentelemetry.metrics import set_meter_provider
-from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
@@ -16,7 +16,7 @@ def setup_metrics(metrics_collector_host: str | None = None) -> None:
         logger.warning("metrics_collector_host is empty")
         return
 
-    exporter = OTLPMetricExporter(endpoint=f"{metrics_collector_host}/v1/metrics")
+    exporter = OTLPMetricExporter(endpoint=metrics_collector_host, insecure=True)
     reader = PeriodicExportingMetricReader(exporter)
     provider = MeterProvider(metric_readers=[reader])
     set_meter_provider(provider)
