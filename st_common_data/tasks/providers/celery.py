@@ -42,7 +42,7 @@ class CeleryProvider(AbstractProvider):
         max_retries: int = 3,
         default_retry_delay: int = 60,  # minute
         retry_backoff: bool | int = False,
-        retry_on_any_error: bool = False,
+        # retry_on_any_error: bool = False,  # disabling due to celery inner issue https://github.com/celery/celery/issues/5186
         autoretry_for_exception: tuple[Exception, ...] = tuple(),
     ) -> Callable:
         def wrapper(func):
@@ -67,11 +67,8 @@ class CeleryProvider(AbstractProvider):
                 retry_backoff=retry_backoff,
                 retry_jitter=False,
                 default_retry_delay=default_retry_delay,
-                autoretry_for=(
-                    (*autoretry_for_exception, Exception)
-                    if retry_on_any_error
-                    else autoretry_for_exception
-                ),
+
+                **({"autoretry_for": autoretry_for_exception} if autoretry_for_exception else {}),
             )(func)
 
         return wrapper

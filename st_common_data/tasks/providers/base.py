@@ -34,7 +34,7 @@ class AbstractProvider(ABC):
         max_retries: int = 3,
         default_retry_delay: int = 60,  # minute
         retry_backoff: bool | int = False,
-        retry_on_any_error: bool = False,
+        # retry_on_any_error: bool = False,  # disabling due to celery inner issue https://github.com/celery/celery/issues/5186
         autoretry_for_exception: tuple[Exception, ...] = tuple(),
     ) -> Callable:
         pass
