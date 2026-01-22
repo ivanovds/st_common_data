@@ -217,17 +217,10 @@ def is_holiday(current_datetime):
     if not HOLIDAYS_LIST_CACHE:
         from st_common_data.datum import api_get_holidays
         HOLIDAYS_LIST_CACHE = api_get_holidays(
-<<<<<<< HEAD
-                datum_api_url=DATUM_API_URL,
-                service_auth0_token=service_auth0_token,
-                gte_date='2018-01-01',
-                lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
-=======
             datum_api_url=DATUM_API_URL,
             service_auth0_token=service_auth0_token,
             gte_date='2018-01-01',
             lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
->>>>>>> 0.3.2.0
         )
     for row in HOLIDAYS_LIST_CACHE:
         if date_str == row['holiday_date']:
