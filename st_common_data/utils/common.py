@@ -2,22 +2,116 @@ import psycopg2
 from psycopg2 import extras
 import datetime
 import pytz
+import logging
+import time
+import requests
 from decimal import Decimal, ROUND_HALF_UP
 from dateutil.relativedelta import relativedelta
-from typing import Union
+from typing import Union, Callable
 
+logger = logging.getLogger(__name__)
 
 try:
     from app.settings import config
     from st_common_data.auth.fastapi_auth import service_auth0_token
+=======
+
     DATUM_API_URL = config.datum_api_url
-except Exception as e:
+    PROJECT_NAME = config.project_name
+    VERSION = config.version
     try:
         from django.conf import settings
         from st_common_data.auth.django_auth import service_auth0_token
         DATUM_API_URL = settings.DATUM_API_URL
+        PROJECT_NAME = settings.PROJECT_NAME
+        VERSION = settings.VERSION
     except Exception:
-        pass
+        DATUM_API_URL = None
+        PROJECT_NAME = None
+        VERSION = None
+
+HOLIDAYS_LIST_CACHE = None
+
+
+def make_project_info_dict() -> dict[str, str]:
+    try:
+        version, environment = VERSION.split("-")
+    except ValueError:
+        version, environment = "1.0.0", "test"
+        logger.error(f"Unsupported version of project: {VERSION}")
+    return {
+        "name": PROJECT_NAME,
+        "version": version,
+        "environment": environment,
+    }
+
+
+def make_user_agent() -> str:
+    info = make_project_info_dict()
+    return f"{info['name']}/{info['version']} {info['environment']}"
+
+
+def http_request(
+        method: str,
+        url: str,
+        bearer: str = None,
+        data: dict = None,
+        params: dict = None,
+        timeout: int = 30,
+        retry: int = 0,
+        retry_time: int = 10,
+        error_msg_prefix: str = None,
+        raw_data: bool = False,
+        headers: dict = None,
+        verify_sert: bool = True,
+        proxies: dict = None,
+        multipart_form_data: bool = False,
+        msk_callback: Callable = None
+):
+    variables = locals()
+
+    if headers is None:
+        headers = {'Authorization': f'Bearer {bearer}'}
+
+    headers['User-Agent'] = make_user_agent()
+
+    response = requests.request(
+        method=method,
+        url=url,
+        json=data if not multipart_form_data else None,
+        data=data if multipart_form_data else None,
+        params=params,
+        headers=headers,
+        timeout=timeout,
+        verify=verify_sert,
+        proxies=proxies
+    )
+
+    if not response.ok:
+        if retry:
+            time.sleep(retry_time)
+            variables['retry'] -= 1
+            result = http_request(**variables)
+        else:
+            error_message = f'{url} returned with {response.status_code} status code, details:  {response.text}'
+            # update message
+            if error_msg_prefix:
+                error_message = error_message + error_message
+
+            if msk_callback:
+                msk_callback(text=error_message)
+            logger.error(error_message)
+            raise Exception(f'{url} returned with {response.status_code} status code, details:  {response.text}')
+    else:
+        if raw_data:
+            result = response.content
+        else:
+            try:
+                result = response.json()
+            except:
+                result = None
+
+    return result
 
 
 HOLIDAYS_LIST_CACHE = None
@@ -66,6 +160,40 @@ def touch_db_with_dict_response(query, dbp, params=None, save=False, returning=F
         raise Exception(f'ERR touch_db_with_dict_response: {str(err)}')
 
 
+def touch_db_with_connection(connection, query, params=None, save=False, returning=False,
+                             transaction=False, dict_response: bool = True):
+    extras.register_default_jsonb(
+        connection.connection,
+        globally=False,
+        loads=lambda x: x,
+    )
+    try:
+        with connection.cursor() as cursor:
+            if not transaction:
+                cursor.execute(query, params)
+            else:
+                for part in query:
+                    cursor.execute(part)
+            if save:
+                connection.commit()
+                if returning:
+                    if dict_response:
+                        columns = [col[0] for col in cursor.description]
+                        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                    else:
+                        return cursor.fetchall()
+                else:
+                    return True
+            else:
+                if dict_response:
+                    columns = [col[0] for col in cursor.description]
+                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                else:
+                    return cursor.fetchall()
+    except psycopg2.Error as err:
+        raise Exception(f'ERR touch_db_with_dict_response: {str(err)}')
+
+
 def get_current_datetime():
     return datetime.datetime.now(pytz.timezone('UTC')).replace(microsecond=0, tzinfo=None)
 
@@ -88,10 +216,17 @@ def is_holiday(current_datetime):
     if not HOLIDAYS_LIST_CACHE:
         from st_common_data.datum import api_get_holidays
         HOLIDAYS_LIST_CACHE = api_get_holidays(
+<<<<<<< HEAD
                 datum_api_url=DATUM_API_URL,
                 service_auth0_token=service_auth0_token,
                 gte_date='2018-01-01',
                 lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
+=======
+            datum_api_url=DATUM_API_URL,
+            service_auth0_token=service_auth0_token,
+            gte_date='2018-01-01',
+            lte_date=str((datetime.datetime.now() + relativedelta(years=2)).date())
+>>>>>>> 0.3.2.0
         )
     for row in HOLIDAYS_LIST_CACHE:
         if date_str == row['holiday_date']:

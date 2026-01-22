@@ -1,10 +1,11 @@
 import datetime
 import requests
 import json
-import redis
+import re
 import logging
 from typing import Optional, Type
 from urllib.request import urlopen
+from st_common_data.redis import MasterSlavesRedis
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,30 @@ class SingletonMeta(type):
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
         return cls._instances[cls]
+
+
+def proceed_user_agent(user_agent):
+    pattern = r"([\w\d-]*)(?:\/([\.0-9]*))?(?: (.*))?"
+
+    if not user_agent:
+        raise ValueError("UserAgent is None")
+
+    result = re.fullmatch(pattern, user_agent)
+
+    if not result:
+        raise ValueError("UserAgent is invalid")
+
+    app_name, version, env = result.groups()
+    data = {
+        "app_name": app_name,
+        "version": version,
+        "env": env,
+    }
+
+    if not app_name:
+        raise ValueError("App Name not found in UserAgent")
+
+    return data
 
 
 class JWKS(metaclass=SingletonMeta):
@@ -74,8 +99,8 @@ class ServiceAuth0Token(metaclass=SingletonMeta):
 
     @property
     def token(self):
-        redis_client = redis.Redis.from_url(self.redi_url)
-        raw_data = redis_client.get(name=self.token_name)
+        redis_client = MasterSlavesRedis.from_url(self.redi_url)
+        raw_data = redis_client.get(self.token_name)
         if raw_data:
             data = json.loads(raw_data)
             token = data['token']
@@ -99,7 +124,7 @@ class ServiceAuth0Token(metaclass=SingletonMeta):
             'expiration_time': expiration.strftime('%Y-%m-%d %H:%M:%S %Z')
         }
 
-        redis_client = redis.Redis.from_url(self.redi_url)
+        redis_client = MasterSlavesRedis.from_url(self.redi_url)
         redis_client.set(self.token_name, json.dumps(data))
 
         return token
