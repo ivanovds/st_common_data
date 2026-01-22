@@ -37,7 +37,7 @@ HOLIDAYS_LIST_CACHE = None
 def make_project_info_dict() -> dict[str, str]:
     try:
         version, environment = VERSION.split("-")
-    except ValueError:
+    except (ValueError, AttributeError):
         version, environment = "1.0.0", "test"
         logger.error(f"Unsupported version of project: {VERSION}")
     return {
