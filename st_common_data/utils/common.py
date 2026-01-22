@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 try:
     from app.settings import config
     from st_common_data.auth.fastapi_auth import service_auth0_token
-=======
 
     DATUM_API_URL = config.datum_api_url
     PROJECT_NAME = config.project_name
     VERSION = config.version
+except Exception as e:
     try:
         from django.conf import settings
         from st_common_data.auth.django_auth import service_auth0_token
+
         DATUM_API_URL = settings.DATUM_API_URL
         PROJECT_NAME = settings.PROJECT_NAME
         VERSION = settings.VERSION
