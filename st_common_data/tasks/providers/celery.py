@@ -49,9 +49,6 @@ class CeleryProvider(AbstractProvider):
             return shared_task(
                 name=name,
 
-                # to restart on celery shutdown
-                acks_late=True,
-
                 # to not pass None
                 **({"on_failure": on_failure} if on_failure else {}),
 
