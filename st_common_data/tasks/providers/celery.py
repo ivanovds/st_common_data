@@ -1,5 +1,6 @@
 import time
 import traceback
+import logging
 from typing import Callable, Any
 
 from celery import shared_task, current_task
@@ -15,6 +16,9 @@ from .base import AbstractProvider
 
 
 __all__ = ("CeleryProvider",)
+
+
+logger = logging.getLogger(__name__)
 
 
 class CeleryProvider(AbstractProvider):
