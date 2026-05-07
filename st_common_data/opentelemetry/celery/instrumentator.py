@@ -1,4 +1,5 @@
 import logging
+import time
 
 from celery import signals
 from opentelemetry.propagate import extract
@@ -44,12 +45,14 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
         
         # Increment the execution count
         celery_task_counter.add(1, attributes=attributes)
+        logger.info("Task %s[%s] executed with status %s", task.name, task_id, state)
         
         # Record the duration if we have a start time
         start_time = getattr(task.request, 'otel_start_time', None)
         if start_time:
             duration = time.time() - start_time
             celery_task_duration.record(duration, attributes=attributes)
+            logger.info("Metrics for task %s (status: %s, duration: %.4fs) recorded to OpenTelemetry", task.name, state, duration)
 
     def _trace_received(self, request, **kwargs):
         request.traceparent = request.message.headers.get("traceparent")
