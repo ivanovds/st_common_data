@@ -43,11 +43,9 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
             "status": state
         }
         
-        # Increment the execution count
         celery_task_counter.add(1, attributes=attributes)
         logger.info("Task %s[%s] executed with status %s", task.name, task_id, state)
         
-        # Record the duration if we have a start time
         start_time = getattr(task.request, 'otel_start_time', None)
         if start_time:
             duration = time.time() - start_time
