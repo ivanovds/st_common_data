@@ -12,20 +12,22 @@ logger = logging.getLogger(__name__)
 
 __all__ = ("CustomCeleryInstrumentor",)
 
-meter = metrics.get_meter(__name__)
-celery_task_duration = meter.create_histogram(
-    name="celery_task_duration",
-    description="Duration of Celery tasks in seconds",
-    unit="s",
-)
-celery_task_counter = meter.create_counter(
-    name="celery_task_executions_count",
-    description="Number of times a Celery task was executed",
-)
-
 class CustomCeleryInstrumentor(CeleryInstrumentor):
     def _instrument(self, **kwargs):
         super()._instrument(**kwargs)
+        
+        meter_provider = kwargs.get("meter_provider")
+        self.meter = metrics.get_meter(__name__, meter_provider=meter_provider)
+        self.celery_task_duration = self.meter.create_histogram(
+            name="celery_task_duration",
+            description="Duration of Celery tasks in seconds",
+            unit="s",
+        )
+        self.celery_task_counter = self.meter.create_counter(
+            name="celery_task_executions_count",
+            description="Number of times a Celery task was executed",
+        )
+
         signals.task_received.connect(self._trace_received, weak=False)
 
         signals.task_prerun.connect(self._metric_start_timer, weak=False)
@@ -43,13 +45,13 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
             "status": state
         }
         
-        celery_task_counter.add(1, attributes=attributes)
+        self.celery_task_counter.add(1, attributes=attributes)
         logger.info("Task %s[%s] executed with status %s", task.name, task_id, state)
         
         start_time = getattr(task.request, 'otel_start_time', None)
         if start_time:
             duration = time.time() - start_time
-            celery_task_duration.record(duration, attributes=attributes)
+            self.celery_task_duration.record(duration, attributes=attributes)
             logger.info("Metrics for task %s (status: %s, duration: %.4fs) recorded to OpenTelemetry", task.name, state, duration)
 
     def _trace_received(self, request, **kwargs):
