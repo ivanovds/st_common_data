@@ -35,7 +35,8 @@ def setup_metrics(resource: Resource, metrics_collector_host: str | None = None)
     # We must forcefully unlock it here before setting the new one!
     # -------------------------------------------------------------
     from opentelemetry import metrics as otel_metrics
-    otel_metrics._METER_PROVIDER_SET_ONCE._is_set = False
+    if hasattr(otel_metrics, "_METER_PROVIDER_SET_ONCE"):
+        otel_metrics._METER_PROVIDER_SET_ONCE._is_set = False
     otel_metrics._METER_PROVIDER = None
     
     set_meter_provider(provider)
