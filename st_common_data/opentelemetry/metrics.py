@@ -18,7 +18,9 @@ def setup_metrics(resource: Resource, metrics_collector_host: str | None = None)
         return
 
     exporter = OTLPMetricExporter(endpoint=metrics_collector_host, insecure=True)
-    reader = PeriodicExportingMetricReader(exporter)
+    
+    # Lower export interval to 10 seconds (default is 60s) to see if the thread is alive
+    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=10000)
     
     provider = MeterProvider(resource=resource, metric_readers=[reader])
     

@@ -66,6 +66,12 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
             duration = time.time() - start_time
             duration_instrument.record(duration, attributes=attributes)
             logger.info("Metrics for task %s (status: %s, duration: %.4fs) recorded to OpenTelemetry", task.name, state, duration)
+        
+        # If workers are killed/restarted frequently, the background thread won't have time to flush.
+        # We force flush here to guarantee delivery before the worker potentially dies.
+        provider = metrics.get_meter_provider()
+        if hasattr(provider, "force_flush"):
+            provider.force_flush()
 
 
     def _trace_received(self, request, **kwargs):
