@@ -15,33 +15,31 @@ __all__ = ("CustomCeleryInstrumentor",)
 class CustomCeleryInstrumentor(CeleryInstrumentor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._pid = None
+        self._meter = None
         self._celery_task_duration = None
         self._celery_task_counter = None
 
-    def _instrument(self, **kwargs):
-        super()._instrument(**kwargs)
-        
-        def _init_instruments(**_):
-            meter = metrics.get_meter(__name__)
-            self._celery_task_duration = meter.create_histogram(
+    def _get_instruments(self):
+        import os
+        current_pid = os.getpid()
+        if self._pid != current_pid:
+            self._meter = metrics.get_meter(__name__)
+            self._celery_task_duration = self._meter.create_histogram(
                 name="celery_task_duration",
                 description="Duration of Celery tasks in seconds",
                 unit="s",
             )
-            self._celery_task_counter = meter.create_counter(
+            self._celery_task_counter = self._meter.create_counter(
                 name="celery_task_executions_count",
                 description="Number of times a Celery task was executed",
             )
-            logger.debug("Celery custom instruments initialized.")
+            self._pid = current_pid
+        return self._celery_task_duration, self._celery_task_counter
 
-        # Initialize for the current process
-        _init_instruments()
+    def _instrument(self, **kwargs):
+        super()._instrument(**kwargs)
         
-        # Re-initialize explicitly after Celery forks a worker process.
-        # This completely avoids having to check PIDs on every task execution.
-        from celery.signals import worker_process_init
-        worker_process_init.connect(_init_instruments, weak=False)
-
         signals.task_received.connect(self._trace_received, weak=False)
         signals.task_prerun.connect(self._metric_start_timer, weak=False)
         signals.task_postrun.connect(self._metric_record_results, weak=False)
@@ -58,14 +56,25 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
             "status": state
         }
         
-        self._celery_task_counter.add(1, attributes=attributes)
+        duration_instrument, counter_instrument = self._get_instruments()
+        
+        counter_instrument.add(1, attributes=attributes)
         logger.info("Task %s[%s] executed with status %s", task.name, task_id, state)
         
         start_time = getattr(task.request, 'otel_start_time', None)
         if start_time:
             duration = time.time() - start_time
-            self._celery_task_duration.record(duration, attributes=attributes)
+            duration_instrument.record(duration, attributes=attributes)
             logger.info("Metrics for task %s (status: %s, duration: %.4fs) recorded to OpenTelemetry", task.name, state, duration)
+        
+        # DEBUG: Let's inspect the active MeterProvider and FORCE it to flush immediately
+        provider = metrics.get_meter_provider()
+        logger.info(f"[DEBUG] Active MeterProvider is: {provider.__class__.__name__}")
+        if hasattr(provider, "force_flush"):
+            logger.info("[DEBUG] Forcing metric flush to console and collector...")
+            provider.force_flush()
+        else:
+            logger.warning("[DEBUG] Provider does not have force_flush! (Is it a NoOpMeterProvider?)")
 
     def _trace_received(self, request, **kwargs):
         request.traceparent = request.message.headers.get("traceparent")
