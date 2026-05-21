@@ -66,15 +66,7 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
             duration = time.time() - start_time
             duration_instrument.record(duration, attributes=attributes)
             logger.info("Metrics for task %s (status: %s, duration: %.4fs) recorded to OpenTelemetry", task.name, state, duration)
-        
-        # DEBUG: Let's inspect the active MeterProvider and FORCE it to flush immediately
-        provider = metrics.get_meter_provider()
-        logger.info(f"[DEBUG] Active MeterProvider is: {provider.__class__.__name__}")
-        if hasattr(provider, "force_flush"):
-            logger.info("[DEBUG] Forcing metric flush to console and collector...")
-            provider.force_flush()
-        else:
-            logger.warning("[DEBUG] Provider does not have force_flush! (Is it a NoOpMeterProvider?)")
+
 
     def _trace_received(self, request, **kwargs):
         request.traceparent = request.message.headers.get("traceparent")

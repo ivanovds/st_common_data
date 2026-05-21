@@ -4,7 +4,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.metrics import set_meter_provider
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader, ConsoleMetricExporter
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
 
 __all__ = ("setup_metrics",)
@@ -17,14 +17,10 @@ def setup_metrics(resource: Resource, metrics_collector_host: str | None = None)
         logger.warning("metrics_collector_host is empty")
         return
 
-    
     exporter = OTLPMetricExporter(endpoint=metrics_collector_host, insecure=True)
     reader = PeriodicExportingMetricReader(exporter)
     
-    console_exporter = ConsoleMetricExporter()
-    console_reader = PeriodicExportingMetricReader(console_exporter)
-    
-    provider = MeterProvider(resource=resource, metric_readers=[reader, console_reader])
+    provider = MeterProvider(resource=resource, metric_readers=[reader])
     
     # -------------------------------------------------------------
     # CRITICAL FIX FOR MULTIPROCESSING (CELERY/GUNICORN)
