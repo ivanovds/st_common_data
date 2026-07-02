@@ -165,6 +165,14 @@ class Auth0CAPAuthentication(Auth0Authentication):
     auth0_api_audience = settings.AUTH0_CAP_API_AUDIENCE
 
 
+class Auth0APEAuthentication(Auth0Authentication):
+    """
+    An authentication plugin that authenticates requests through a JSON web
+    token provided in a request header (for APE api).
+    """
+    auth0_api_audience = settings.AUTH0_APE_API_AUDIENCE
+
+
 class Auth0PineServiceAuthentication(Auth0ServiceAuthentication):
     """
     An authentication plugin for service auth (for pine_api).
