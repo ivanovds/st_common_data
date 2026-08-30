@@ -5,6 +5,7 @@ from opentelemetry.metrics import set_meter_provider
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.view import DropAggregation, View
 
 
 __all__ = ("setup_metrics",)
@@ -22,7 +23,16 @@ def setup_metrics(resource: Resource, metrics_collector_host: str | None = None)
     # Lower export interval to 10 seconds (default is 60s) to see if the thread is alive
     reader = PeriodicExportingMetricReader(exporter, export_interval_millis=10000)
     
-    provider = MeterProvider(resource=resource, metric_readers=[reader])
+    provider = MeterProvider(
+        resource=resource,
+        metric_readers=[reader],
+        views=[
+            View(
+                instrument_name="flower.task.runtime.seconds",
+                aggregation=DropAggregation(),
+            ),
+        ],
+    )
     
     # -------------------------------------------------------------
     # CRITICAL FIX FOR MULTIPROCESSING (CELERY/GUNICORN)

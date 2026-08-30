@@ -12,6 +12,11 @@ from celery import Celery
 
 from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 
+from st_common_data.opentelemetry.django.http_route import (
+    request_hook as _http_route_request_hook,
+    response_hook as _http_route_response_hook,
+)
+from st_common_data.opentelemetry.semconv import apply_semconv_opt_in
 from st_common_data.opentelemetry.metrics import setup_metrics as _setup_metrics
 from st_common_data.opentelemetry.celery.setup import setup_telemetry as setup_celery_telemetry
 from st_common_data.opentelemetry.celery.instrumentator import CustomCeleryInstrumentor
@@ -25,14 +30,23 @@ _WORKER_POSTFIX = "-worker"
 _OTL_METRICS_HOST = settings.OTL_METRICS_HOST 
 
 
-def setup_telemetry(service_name: str | None = None) -> None:
-    resource = Resource.create({"service.name": service_name or settings.PROJECT_NAME})
+def setup_telemetry(service_name: str | None = None, role: str = "backend") -> None:
+    apply_semconv_opt_in(
+        getattr(settings, "OTEL_SEMCONV_STABILITY_OPT_IN", None)
+    )
+
+    resource = Resource.create({
+        "service.name": service_name or settings.PROJECT_NAME,
+        "service.role": role,
+    })
     provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(provider)
 
     LoggingInstrumentor().instrument(set_logging_format=False)
     DjangoInstrumentor().instrument(
         middleware_position=1, # to be after health middleware
+        request_hook=_http_route_request_hook,
+        response_hook=_http_route_response_hook,
     )
     CustomCeleryInstrumentor().instrument()
     RequestsInstrumentor().instrument()
@@ -47,5 +61,6 @@ def setup_celery(app: Celery) -> None:
         partial(
             setup_telemetry,
             service_name=settings.PROJECT_NAME + _WORKER_POSTFIX,
+            role="worker",
         ),
     )

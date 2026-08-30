@@ -11,6 +11,7 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 from celery import Celery
 
+from st_common_data.opentelemetry.semconv import apply_semconv_opt_in
 from st_common_data.opentelemetry.metrics import setup_metrics as _setup_metrics
 from st_common_data.opentelemetry.celery.setup import setup_telemetry as setup_celery_telemetry
 from st_common_data.opentelemetry.celery.instrumentator import CustomCeleryInstrumentor
@@ -26,8 +27,15 @@ _WORKER_POSTFIX = "-worker"
 _OTL_METRICS_HOST = settings.otl_metrics_host
 
 
-def _setup_telemetry(service_name: str | None = None) -> None:
-    resource = Resource.create({"service.name": service_name or settings.project_name})
+def _setup_telemetry(service_name: str | None = None, role: str = "backend") -> None:
+    apply_semconv_opt_in(
+        getattr(settings, "otel_semconv_stability_opt_in", None)
+    )
+
+    resource = Resource.create({
+        "service.name": service_name or settings.project_name,
+        "service.role": role,
+    })
     provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(provider)
 
@@ -51,5 +59,6 @@ def setup_celery(app: Celery) -> None:
         partial(
             _setup_telemetry,
             service_name=settings.project_name + _WORKER_POSTFIX,
+            role="worker",
         )
     )
