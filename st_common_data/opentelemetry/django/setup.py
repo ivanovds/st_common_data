@@ -12,10 +12,6 @@ from celery import Celery
 
 from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 
-from st_common_data.opentelemetry.django.http_route import (
-    request_hook as _http_route_request_hook,
-    response_hook as _http_route_response_hook,
-)
 from st_common_data.opentelemetry.semconv import apply_semconv_opt_in
 from st_common_data.opentelemetry.metrics import setup_metrics as _setup_metrics
 from st_common_data.opentelemetry.celery.setup import setup_telemetry as setup_celery_telemetry
@@ -25,6 +21,16 @@ from st_common_data.opentelemetry.celery.instrumentator import CustomCeleryInstr
 __all__ = ("setup_telemetry", "setup_celery",)
 
 logger = logging.getLogger(__name__)
+
+try:
+    from st_common_data.opentelemetry.django.http_route import (
+        request_hook as _http_route_request_hook,
+        response_hook as _http_route_response_hook,
+    )
+except Exception:
+    logger.exception("http.route hooks unavailable")
+    _http_route_request_hook = None
+    _http_route_response_hook = None
 
 _WORKER_POSTFIX = "-worker"
 _OTL_METRICS_HOST = settings.OTL_METRICS_HOST 
