@@ -1,3 +1,4 @@
+import functools
 import logging
 import time
 
@@ -13,6 +14,18 @@ logger = logging.getLogger(__name__)
 __all__ = ("CustomCeleryInstrumentor",)
 
 _PUBLISHED_AT_HEADER = "otel_published_at"
+
+
+def _never_fail(func):
+    """Celery sends task signals unguarded, so telemetry must not raise into a task."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            logger.exception("celery telemetry hook %s failed", func.__name__)
+
+    return wrapper
 
 class CustomCeleryInstrumentor(CeleryInstrumentor):
     def __init__(self, *args, **kwargs):
@@ -90,11 +103,13 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
         signals.task_prerun.connect(self._metric_start_timer, weak=False)
         signals.task_postrun.connect(self._metric_record_results, weak=False)
     
+    @_never_fail
     def _stamp_published_at(self, headers=None, **kwargs):
         """Stamp the publish time so the worker can measure how long the task queued."""
         if isinstance(headers, dict):
             headers[_PUBLISHED_AT_HEADER] = time.time()
 
+    @_never_fail
     def _metric_start_timer(self, task_id, task, *args, **kwargs):
         """Save the start time, mark the task as running, record its queue wait."""
         now = time.time()
@@ -111,6 +126,7 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
                 attributes={"task_name": task.name},
             )
         
+    @_never_fail
     def _metric_record_results(self, task_id, task, *args, **kwargs):
         """Calculate duration and increment count when the task finishes."""
         state = kwargs.get('state', 'UNKNOWN')
@@ -147,10 +163,11 @@ class CustomCeleryInstrumentor(CeleryInstrumentor):
         if now - self._last_flush >= 10:
             provider = metrics.get_meter_provider()
             if hasattr(provider, "force_flush"):
-                provider.force_flush()
+                provider.force_flush(timeout_millis=2000)
             self._last_flush = now
 
 
+    @_never_fail
     def _trace_received(self, request, **kwargs):
         request.traceparent = request.message.headers.get("traceparent")
         ctx = extract(request, getter=celery_getter)
